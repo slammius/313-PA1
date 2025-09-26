@@ -24,6 +24,7 @@ int main (int argc, char *argv[]) {
 	int e = 1;
 	string fname = "";
 	int message_capacity = MAX_MESSAGE;
+	vector<FIFORequestChannel*> channels;
 
 	bool input_p = false; 
 	bool input_t = false;
@@ -69,8 +70,21 @@ int main (int argc, char *argv[]) {
 			execl("./server", "./server", nullptr);
 		}
 	}
-	FIFORequestChannel* control_channel = new FIFORequestChannel("control", FIFORequestChannel::CLIENT_SIDE);
-	FIFORequestChannel* channel = control_channel;
+    FIFORequestChannel* control_channel = new FIFORequestChannel("control", FIFORequestChannel::CLIENT_SIDE);
+    channels.push_back(control_channel);
+    FIFORequestChannel* channel = channels.back();
+
+	// 4.4 
+	if (input_c) {
+		MESSAGE_TYPE channel_message = NEWCHANNEL_MSG;
+		control_channel->cwrite(&channel_message, sizeof(MESSAGE_TYPE));
+
+		char channel_name[20] = {};
+		control_channel->cread(channel_name, sizeof(channel_name));
+		FIFORequestChannel* channel2 = new FIFORequestChannel(channel_name, FIFORequestChannel::CLIENT_SIDE);
+		channels.push_back(channel2);
+    	channel = channel2;
+	}
 
 	// 4.2 
 	if (input_p && input_t && input_e) {
@@ -143,19 +157,11 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-	// 4.4 
-	if (input_c) {
-		MESSAGE_TYPE channel_message = NEWCHANNEL_MSG;
-		control_channel->cwrite(&channel_message, sizeof(MESSAGE_TYPE));
-
-		char channel_name[20] = {};
-		control_channel->cread(channel_name, sizeof(channel_name));
-		channel = new FIFORequestChannel(channel_name, FIFORequestChannel::CLIENT_SIDE);
-	}
-
 	// 4.5 
-	MESSAGE_TYPE m = QUIT_MSG;
-	control_channel->cwrite(&m, sizeof(MESSAGE_TYPE));
-	delete control_channel;
+	for (size_t i = 0; i < channels.size(); i++) {
+		MESSAGE_TYPE m = QUIT_MSG;
+		channels[i]->cwrite(&m, sizeof(MESSAGE_TYPE));
+		delete channels[i];
+	}
 	wait(nullptr);
 }
